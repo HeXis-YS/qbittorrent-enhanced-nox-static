@@ -1,0 +1,186 @@
+# @credits https://github.com/c0re100/qBittorrent-Enhanced-Edition
+name: matrix multi build and release - Enhanced
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os_id: [alpine]
+        os_version_id: [edge]
+        arch_type: [x86_64]
+        mtune_arch: [znver2]
+        libtorrent_version: ["1.2", "2.0"]
+        build_tool: ["", cmake]
+        include:
+          - build_tool: ""
+            qbt_qt_version_name: "qt5-"
+            qbt_qt_version: "5"
+
+          - build_tool: "cmake"
+            qbt_qt_version_name: "qt6-"
+            qbt_qt_version: "6"
+
+    name: "${{ matrix.arch_type }}-${{ matrix.mtune_arch }}-${{ matrix.qbt_qt_version_name }}libtorrent-v${{ matrix.libtorrent_version }}"
+
+    env:
+      build_dir: "qbt-build"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Host - update
+        run: sudo apt-get update
+
+      - name: Host - upgrade
+        run: sudo apt-get -y upgrade
+
+      - name: Host - Install host qemu-static
+        run: sudo apt-get install -y qemu binfmt-support qemu-user-static
+
+      - name: Host - Docker multiarch bootstrap
+        run: sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: Host - Create Docker template env file
+        run: |
+          echo "qbt_build_tool=${{ matrix.build_tool }}" > env.custom
+          echo "qbt_cross_name=${{ matrix.arch_type  }}" >> env.custom
+          echo "qbt_libtorrent_version=${{ matrix.libtorrent_version }}" >> env.custom
+          echo "qbt_qt_version=${{ matrix.qbt_qt_version }}" >> env.custom
+          echo "MTUNE_ARCH=${{ matrix.mtune_arch }}" >> env.custom
+
+      - name: Host - Create docker multiarch container
+        run: docker run --name multiarch -it -d --env-file env.custom -w /root -v ${{ github.workspace }}:/root ${{ matrix.os_id }}:${{ matrix.os_version_id }}
+
+      - name: Docker - apk update
+        run: docker exec -w /root multiarch apk update
+
+      - name: Docker - apk install bash
+        run: docker exec -w /root multiarch apk add bash
+
+      - name: Docker - Bootstrap
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
+
+      - name: Docker - zlib-ng
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib -o
+
+      - name: Docker - iconv
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh iconv -o
+
+      - name: Docker - icu
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh icu -o
+
+      - name: Docker - openssl
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh openssl -o
+
+      - name: Docker - boost
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh boost -o
+
+      - name: Docker - libtorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh libtorrent -o
+
+      - name: Docker - double_conversion
+        if: matrix.build_tool == 'cmake'
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh double_conversion -o
+
+      - name: Docker - qtbase -i
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qtbase -i -o
+
+      - name: Docker - qttools
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qttools -o
+
+      - name: Docker - qbittorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qbittorrent -o
+
+      - name: Docker - Set release asset name
+        run: docker exec -w /root/${{ env.build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.arch_type }}-${{ matrix.mtune_arch }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
+
+      - name: Docker - Release Info
+        run: docker exec -w /root/${{ env.build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.build_dir }}/completed''
+
+      - name: Host - Upload libtorrent-v${{ matrix.libtorrent_version }}-qbittorrent-nox and release info artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: libtorrent-v${{ matrix.libtorrent_version }}-${{ matrix.arch_type }}-${{ matrix.mtune_arch }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
+          path: |
+            ${{ env.build_dir }}/completed/*
+            !${{ env.build_dir }}/completed/*.png
+
+      - name: Host - Upload cmake graphs artifact
+        if: matrix.build_tool == 'cmake'
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{ matrix.arch_type }}-libtorrent-v${{ matrix.libtorrent_version }}-graphs"
+          path: "${{ env.build_dir }}/completed/*.png"
+
+  release:
+    runs-on: ubuntu-22.04
+    needs: build
+    if: always() && contains(needs.*.result, 'success') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    strategy:
+      fail-fast: false
+      matrix:
+        libtorrent_version: ["1.2", "2.0"]
+        include:
+          - libtorrent_version: "2.0"
+            preview_release: false
+
+          - libtorrent_version: "1.2"
+            preview_release: true
+
+    name: "Publish release libtorrent-v${{ matrix.libtorrent_version }}"
+
+    env:
+      build_dir: "qbt-build"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Host - Download qbittorrent-nox artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Host - 1.2 artifacts organise for release
+        run: |
+          mkdir -p "1.2"
+          for files in libtorrent-v1.2-*-qbittorrent-nox; do
+              cp -rf ${files}/* "1.2/"
+          done
+
+      - name: Host - 2.0 artifacts organise for release
+        run: |
+          mkdir -p "2.0"
+          for files in libtorrent-v2.0-*-qbittorrent-nox; do
+              cp -rf ${files}/* "2.0/"
+          done
+
+      - name: Host - merge release-info
+        if: matrix.libtorrent_version == '1.2'
+        run: paste -d '\n' ${{ matrix.libtorrent_version }}/dependency-version.json 2.0/dependency-version.json | uniq > dependency-version.json
+
+      - name: Host - merge release-info
+        if: matrix.libtorrent_version == '2.0'
+        run: paste -d '\n' 1.2/dependency-version.json ${{ matrix.libtorrent_version }}/dependency-version.json | uniq > dependency-version.json
+
+      - name: Host - Bootstrap release tag
+        run: echo "release_tag=$(cat ${{ matrix.libtorrent_version }}/tag.md)" >> $GITHUB_ENV
+
+      - name: Host - Bootstrap release title
+        run: echo "release_title=$(cat ${{ matrix.libtorrent_version }}/title.md)" >> $GITHUB_ENV
+
+      - name: Host- Create release - tag - assets
+        uses: ncipollo/release-action@v1.10.0
+        with:
+          prerelease: "${{ matrix.preview_release }}"
+          artifacts: "${{ matrix.libtorrent_version }}/*-qbittorrent-nox,dependency-version.json"
+          replacesArtifacts: true
+          tag: "${{ env.release_tag }}"
+          name: "${{ env.release_title }}"
+          bodyFile: "${{ matrix.libtorrent_version }}/release.md"
+          allowUpdates: true
+          token: "${{ secrets.GITHUB_TOKEN }}"

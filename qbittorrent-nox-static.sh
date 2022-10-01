@@ -326,7 +326,7 @@ while (("${#}")); do
 			shift
 			;;
 		-o | --optimize)
-			optimize="-march=native"
+			optimize="-s -w -Ofast -pipe"
 			shift
 			;;
 		-h-bv | --help-boost-version)
@@ -492,7 +492,7 @@ custom_flags_reset() {
 #######################################################################################################################################################
 set_module_urls() {
 	# Update check url
-	script_url="https://raw.githubusercontent.com/userdocs/qbittorrent-nox-static/master/qbittorrent-nox-static.sh"
+	script_url="https://raw.githubusercontent.com/HeXis-YS/qbittorrent-enhanced-nox-static/master/qbittorrent-nox-static.sh"
 
 	cmake_github_tag="$(git_git ls-remote -q -t --refs https://github.com/userdocs/qbt-cmake-ninja-crossbuilds.git | awk '{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
 	cmake_debian_version=${cmake_github_tag%_*}
@@ -580,11 +580,11 @@ set_module_urls() {
 	libtorrent_github_tag_default="$(grep -Eom1 "v${qbt_libtorrent_version}.([0-9]{1,2})" <<< "${libtorrent_github_tags_list}")"
 	libtorrent_github_tag="${libtorrent_github_tag:-$libtorrent_github_tag_default}"
 
-	qbittorrent_github_url="https://github.com/qbittorrent/qBittorrent.git"
-	qbittorrent_github_tag_default="$(git_git ls-remote -q -t --refs https://github.com/qbittorrent/qBittorrent.git | awk '{sub("refs/tags/", "");sub("(.*)(-[^0-9].*|rc|alpha|beta)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n1)"
+	qbittorrent_github_url="https://github.com/HeXis-YS/qBittorrent-Enhanced-Edition.git"
+	qbittorrent_github_tag_default="$(git_git ls-remote -q -t --refs https://github.com/HeXis-YS/qBittorrent-Enhanced-Edition.git | awk '{sub("refs/tags/", "");sub("(.*)(-[^0-9].*|rc|alpha|beta)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n1)"
 	qbittorrent_github_tag="${qbitorrent_github_tag:-$qbittorrent_github_tag_default}"
 
-	#### Gihub Workflow URLS ##########################################################################################################################
+	#### Github Workflow URLS ##########################################################################################################################
 	qbt_workflow_files_bison="https://github.com/userdocs/qbt-workflow-files/releases/latest/download/bison.tar.xz"
 	qbt_workflow_files_gawk="https://github.com/userdocs/qbt-workflow-files/releases/latest/download/gawk.tar.xz"
 
@@ -1462,7 +1462,7 @@ while (("${#}")); do
 			echo -e " ${td}${clm}export qbt_qt_version=\"\"${cend} ${td}---------${cend} ${td}${clr}options${cend} ${td}5,5.15,6,6.2,6.3 and so on${cend}"
 			echo -e " ${td}${clm}export qbt_build_tool=\"\"${cend} ${td}---------${cend} ${td}${clr}options${cend} ${td}qmake cmake${cend}"
 			echo -e " ${td}${clm}export qbt_cross_name=\"\"${cend} ${td}---------${cend} ${td}${clr}options${cend} ${td}aarch64 armv7 armhf${cend}"
-			echo -e " ${td}${clm}export qbt_patches_url=\"\"${cend} ${td}--------${cend} ${td}${clr}options${cend} ${td}userdocs/qbittorrent-nox-static or usee your full/shorthand github repo${cend}"
+			echo -e " ${td}${clm}export qbt_patches_url=\"\"${cend} ${td}--------${cend} ${td}${clr}options${cend} ${td}HeXis-YS/qbittorrent-enhanced-nox-static or usee your full/shorthand github repo${cend}"
 			echo -e " ${td}${clm}export qbt_workflow_files=\"\"${cend} ${td}-----${cend} ${td}${clr}options${cend} ${td}yes no - qbt-workflow-files repo - custom tags will override${cend}"
 			echo
 			echo -e " ${tb}${tu}Currrent settings${cend}"
