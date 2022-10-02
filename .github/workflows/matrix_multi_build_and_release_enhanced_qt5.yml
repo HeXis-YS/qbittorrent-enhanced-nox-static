@@ -1,0 +1,111 @@
+# @credits https://github.com/c0re100/qBittorrent-Enhanced-Edition
+name: matrix multi build - Enhanced (Qt5)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os_id: [alpine]
+        os_version_id: [edge]
+        arch_type: [x86_64]
+        mtune_arch: [znver2]
+        libtorrent_version: ["1.2"]
+        build_tool: [""]
+        include:
+          - build_tool: ""
+            qbt_qt_version_name: "qt5-"
+            qbt_qt_version: "5"
+
+    name: "${{ matrix.arch_type }}-${{ matrix.mtune_arch }}-${{ matrix.qbt_qt_version_name }}libtorrent-v${{ matrix.libtorrent_version }}"
+
+    env:
+      build_dir: "qbt-build"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Host - update
+        run: sudo apt-get update
+
+      - name: Host - upgrade
+        run: sudo apt-get -y upgrade
+
+      - name: Host - Install host qemu-static
+        run: sudo apt-get install -y qemu binfmt-support qemu-user-static
+
+      - name: Host - Docker multiarch bootstrap
+        run: sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: Host - Create Docker template env file
+        run: |
+          echo "qbt_build_tool=${{ matrix.build_tool }}" > env.custom
+          echo "qbt_cross_name=${{ matrix.arch_type  }}" >> env.custom
+          echo "qbt_libtorrent_version=${{ matrix.libtorrent_version }}" >> env.custom
+          echo "qbt_qt_version=${{ matrix.qbt_qt_version }}" >> env.custom
+          echo "MTUNE_ARCH=${{ matrix.mtune_arch }}" >> env.custom
+
+      - name: Host - Create docker multiarch container
+        run: docker run --name multiarch -it -d --env-file env.custom -w /root -v ${{ github.workspace }}:/root ${{ matrix.os_id }}:${{ matrix.os_version_id }}
+
+      - name: Docker - apk update
+        run: docker exec -w /root multiarch apk update
+
+      - name: Docker - apk install bash
+        run: docker exec -w /root multiarch apk add bash
+
+      - name: Docker - Bootstrap
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
+
+      - name: Docker - zlib-ng
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib -s -o
+
+      - name: Docker - iconv
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh iconv -s -o
+
+      - name: Docker - icu
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh icu -s -o
+
+      - name: Docker - openssl
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh openssl -s -o
+
+      - name: Docker - boost
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh boost -s -o
+
+      - name: Docker - libtorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh libtorrent -s -o
+
+      - name: Docker - qtbase -i
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qtbase -i -s -o
+
+      - name: Docker - qttools
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qttools -s -o
+
+      - name: Docker - qbittorrent
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qbittorrent -s -o
+
+      - name: Docker - Set release asset name
+        run: docker exec -w /root/${{ env.build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.arch_type }}-${{ matrix.mtune_arch }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
+
+      - name: Docker - Release Info
+        run: docker exec -w /root/${{ env.build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.build_dir }}/completed''
+
+      - name: Host - Upload libtorrent-v${{ matrix.libtorrent_version }}-qbittorrent-nox and release info artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: libtorrent-v${{ matrix.libtorrent_version }}-${{ matrix.arch_type }}-${{ matrix.mtune_arch }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
+          path: |
+            ${{ env.build_dir }}/completed/*
+            !${{ env.build_dir }}/completed/*.png
+
+      - name: Host - Upload cmake graphs artifact
+        if: matrix.build_tool == 'cmake'
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{ matrix.arch_type }}-libtorrent-v${{ matrix.libtorrent_version }}-graphs"
+          path: "${{ env.build_dir }}/completed/*.png"

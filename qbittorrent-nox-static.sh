@@ -326,7 +326,7 @@ while (("${#}")); do
 			shift
 			;;
 		-o | --optimize)
-			optimize="-s -w -Ofast -pipe"
+			optimize="-s -w -Ofast -march=${MTUNE_ARCH} -mtune=${MTUNE_ARCH} -flto -pipe"
 			shift
 			;;
 		-h-bv | --help-boost-version)
@@ -477,15 +477,17 @@ set_build_directory() {
 # This function sets some compiler flags globally - b2 settings are set in the ~/user-config.jam  set in the _installation_modules function
 #######################################################################################################################################################
 custom_flags_set() {
+	CFLAGS="${CFLAGS} ${optimize/*/$optimize }"
 	CXXFLAGS="${optimize/*/$optimize }-std=${cxx_standard} -static -w ${qbt_strip_flags} -Wno-psabi -I${include_dir}"
 	CPPFLAGS="${optimize/*/$optimize }-static -w ${qbt_strip_flags} -Wno-psabi -I${include_dir}"
 	LDFLAGS="${optimize/*/$optimize }-static -L${lib_dir} -pthread"
 }
 
 custom_flags_reset() {
+	CFLAGS="${CFLAGS} ${optimize/*/$optimize }"
 	CXXFLAGS="${optimize/*/$optimize } -w -std=${cxx_standard}"
 	CPPFLAGS="${optimize/*/$optimize } -w"
-	LDFLAGS=""
+	LDFLAGS="${LDFLAGS} ${optimize/*/$optimize }"
 }
 #######################################################################################################################################################
 # This function is where we set your URL that we use with other functions.
@@ -2046,6 +2048,17 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 		BOOST_INCLUDEDIR="${qbt_install_dir}/boost"
 		BOOST_BUILD_PATH="${qbt_install_dir}/boost"
 
+		sed -i 's/max_peers_reply = .*/max_peers_reply = 200;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/max_torrents = .*/max_torrents = 20000;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/max_dht_items = .*/max_dht_items = 10000;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/max_peers = .*/max_peers = 20000;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/max_torrent_search_reply = .*/max_torrent_search_reply = 200;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/restrict_routing_ips = .*/restrict_routing_ips = false;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/restrict_search_ips = .*/restrict_search_ips = false;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/ignore_dark_internet = .*/ignore_dark_internet = false;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/block_ratelimit = .*/block_ratelimit = 8;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+		sed -i 's/upload_rate_limit = .*/upload_rate_limit = 6553600;/g' "${qbt_install_dir}/libtorrent/include/libtorrent/kademlia/dht_settings.hpp"
+
 		if [[ "${qbt_build_tool}" == 'cmake' ]]; then
 			mkdir -p "${qbt_install_dir}/graphs/${libtorrent_github_tag}"
 			cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${libtorrent_github_tag}/dep-graph.dot" -G Ninja -B build \
@@ -2204,12 +2217,12 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 
 		# Don't strip by default by disabling these options. We will set it as off by default and use it with a switch
 		echo "CONFIG                 += ${qbt_strip_qmake:-nostrip}" >> "mkspecs/common/linux.conf"
-
+		find . -name "*.conf" -exec sed -i "s|-pipe|-pipe ${optimize}|g" {} +
 		./configure "${multi_qtbase[@]}" -prefix "${qbt_install_dir}" "${icu[@]}" -opensource -confirm-license -release \
 			-openssl-linked -static -c++std "${cxx_standard}" -qt-pcre \
 			-no-feature-glib -no-feature-opengl -no-feature-dbus -no-feature-gui -no-feature-widgets -no-feature-testlib -no-compile-examples \
-			-skip tests -nomake tests -skip examples -nomake examples \
-			-I "${include_dir}" -L "${lib_dir}" QMAKE_LFLAGS="${LDFLAGS}" |& tee "${qbt_install_dir}/logs/${app_name}.log"
+			-skip tests -nomake tests -skip examples -nomake examples -ltcg\
+			-I "${include_dir}" -L "${lib_dir}" QMAKE_CFLAGS+=" ${optimize}" QMAKE_CXXFLAGS+=" ${optimize}" QMAKE_LFLAGS="${LDFLAGS}" |& tee "${qbt_install_dir}/logs/${app_name}.log"
 		make -j"$(nproc)" |& tee -a "${qbt_install_dir}/logs/${app_name}.log"
 
 		post_command build
@@ -2259,7 +2272,7 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 	elif [[ "${qbt_qt_version}" =~ ^5 ]]; then
 		"${qbt_install_dir}/bin/qmake" -set prefix "${qbt_install_dir}" |& tee "${qbt_install_dir}/logs/${app_name}.log"
 
-		"${qbt_install_dir}/bin/qmake" QMAKE_CXXFLAGS="-std=${cxx_standard} -static -w -fpermissive" QMAKE_LFLAGS="-static" |& tee -a "${qbt_install_dir}/logs/${app_name}.log"
+		"${qbt_install_dir}/bin/qmake" QMAKE_CFLAGS+=" ${optimize}" QMAKE_CXXFLAGS="-std=${cxx_standard} -static -w -fpermissive ${optimize}" QMAKE_LFLAGS="-static ${LDFLAGS}" |& tee -a "${qbt_install_dir}/logs/${app_name}.log"
 		make -j"$(nproc)" |& tee -a "${qbt_install_dir}/logs/${app_name}.log"
 
 		post_command build
