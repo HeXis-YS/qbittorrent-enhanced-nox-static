@@ -331,6 +331,7 @@ while (("${#}")); do
 			;;
 		-lto)
 			optimize+=" -flto"
+			lto='yes'
 			shift
 			;;
 		-h-bv | --help-boost-version)
@@ -2216,6 +2217,12 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 			icu=("-no-icu" "-iconv" "QMAKE_CXXFLAGS=-w -fpermissive")
 		fi
 
+		if [[ "${lto}" == 'yes' ]]; then
+			ltcg="-ltcg"
+		else
+			ltcg=""
+		fi
+
 		# Fix 5.15.4 to build on gcc 11
 		sed '/^#  include <utility>/a #  include <limits>' -i "src/corelib/global/qglobal.h"
 
@@ -2229,7 +2236,7 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 		./configure "${multi_qtbase[@]}" -prefix "${qbt_install_dir}" "${icu[@]}" -opensource -confirm-license -release \
 			-openssl-linked -static -c++std "${cxx_standard}" -qt-pcre \
 			-no-feature-glib -no-feature-opengl -no-feature-dbus -no-feature-gui -no-feature-widgets -no-feature-testlib -no-compile-examples \
-			-skip tests -nomake tests -skip examples -nomake examples \
+			-skip tests -nomake tests -skip examples -nomake examples "${ltcg}" \
 			-I "${include_dir}" -L "${lib_dir}" QMAKE_CFLAGS+=" ${optimize}" QMAKE_CXXFLAGS+=" ${optimize}" QMAKE_LFLAGS="${LDFLAGS}" |& tee "${qbt_install_dir}/logs/${app_name}.log"
 		make -j"$(nproc)" |& tee -a "${qbt_install_dir}/logs/${app_name}.log"
 
