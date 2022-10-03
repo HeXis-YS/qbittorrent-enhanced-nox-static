@@ -326,7 +326,11 @@ while (("${#}")); do
 			shift
 			;;
 		-o | --optimize)
-			optimize="-s -w -Ofast -march=${MTUNE_ARCH} -mtune=${MTUNE_ARCH} -flto -pipe"
+			optimize+=" -s -w -Ofast -march=${MTUNE_ARCH} -mtune=${MTUNE_ARCH} -pipe"
+			shift
+			;;
+		-lto)
+			optimize+=" -flto"
 			shift
 			;;
 		-h-bv | --help-boost-version)
@@ -1464,7 +1468,7 @@ while (("${#}")); do
 			echo -e " ${td}${clm}export qbt_qt_version=\"\"${cend} ${td}---------${cend} ${td}${clr}options${cend} ${td}5,5.15,6,6.2,6.3 and so on${cend}"
 			echo -e " ${td}${clm}export qbt_build_tool=\"\"${cend} ${td}---------${cend} ${td}${clr}options${cend} ${td}qmake cmake${cend}"
 			echo -e " ${td}${clm}export qbt_cross_name=\"\"${cend} ${td}---------${cend} ${td}${clr}options${cend} ${td}aarch64 armv7 armhf${cend}"
-			echo -e " ${td}${clm}export qbt_patches_url=\"\"${cend} ${td}--------${cend} ${td}${clr}options${cend} ${td}HeXis-YS/qbittorrent-enhanced-nox-static or usee your full/shorthand github repo${cend}"
+			echo -e " ${td}${clm}export qbt_patches_url=\"\"${cend} ${td}--------${cend} ${td}${clr}options${cend} ${td}userdocs/qbittorrent-nox-static or usee your full/shorthand github repo${cend}"
 			echo -e " ${td}${clm}export qbt_workflow_files=\"\"${cend} ${td}-----${cend} ${td}${clr}options${cend} ${td}yes no - qbt-workflow-files repo - custom tags will override${cend}"
 			echo
 			echo -e " ${tb}${tu}Currrent settings${cend}"
@@ -2217,11 +2221,15 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 
 		# Don't strip by default by disabling these options. We will set it as off by default and use it with a switch
 		echo "CONFIG                 += ${qbt_strip_qmake:-nostrip}" >> "mkspecs/common/linux.conf"
+
 		find . -name "*.conf" -exec sed -i "s|-pipe|-pipe ${optimize}|g" {} +
+		find . -name "*.conf" -exec sed -i "s|-O2|-Ofast|g" {} +
+		find . -name "*.conf" -exec sed -i "s|-O3|-Ofast|g" {} +
+
 		./configure "${multi_qtbase[@]}" -prefix "${qbt_install_dir}" "${icu[@]}" -opensource -confirm-license -release \
 			-openssl-linked -static -c++std "${cxx_standard}" -qt-pcre \
 			-no-feature-glib -no-feature-opengl -no-feature-dbus -no-feature-gui -no-feature-widgets -no-feature-testlib -no-compile-examples \
-			-skip tests -nomake tests -skip examples -nomake examples -ltcg\
+			-skip tests -nomake tests -skip examples -nomake examples \
 			-I "${include_dir}" -L "${lib_dir}" QMAKE_CFLAGS+=" ${optimize}" QMAKE_CXXFLAGS+=" ${optimize}" QMAKE_LFLAGS="${LDFLAGS}" |& tee "${qbt_install_dir}/logs/${app_name}.log"
 		make -j"$(nproc)" |& tee -a "${qbt_install_dir}/logs/${app_name}.log"
 
