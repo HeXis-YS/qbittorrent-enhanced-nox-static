@@ -348,11 +348,11 @@ while (("${#}")); do
 			shift
 			;;
 		-o | --optimize)
-			optimize+=" -s -w -Ofast -march=${MTUNE_ARCH} -mtune=${MTUNE_ARCH} -pipe"
+			optimize+=" -s -Ofast -ffast-math -march=${MTUNE_ARCH} -mtune=${MTUNE_ARCH} -fgraphite-identity -floop-nest-optimize -fipa-pta -fno-semantic-interposition -fdevirtualize-at-ltrans -pipe "
 			shift
 			;;
 		-lto)
-			optimize+=" -flto"
+			optimize+=" -flto=$(nproc) "
 			lto='yes'
 			shift
 			;;
@@ -516,8 +516,8 @@ custom_flags_set() {
 
 custom_flags_reset() {
 	CFLAGS="${CFLAGS} ${optimize/*/$optimize }"
-	CXXFLAGS="${optimize/*/$optimize } -w -std=${cxx_standard}"
-	CPPFLAGS="${optimize/*/$optimize } -w"
+	CXXFLAGS="${optimize/*/$optimize }-w -std=${cxx_standard}"
+	CPPFLAGS="${optimize/*/$optimize }-w"
 	LDFLAGS="${LDFLAGS} ${optimize/*/$optimize }"
 }
 #######################################################################################################################################################
@@ -1913,6 +1913,8 @@ if [[ "${!app_name_skip:-yes}" == 'no' || "${1}" == "${app_name}" ]]; then
 		[[ "${qbt_cross_target}" =~ ^(alpine)$ ]] && echo -e "\narchfound ${qbt_zlib_arch:-x86_64}" >> "${qbt_install_dir}/zlib/cmake/detect-arch.c"
 
 		cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${zlib_version}/dep-graph.dot" -G Ninja -B build \
+			-D CMAKE_C_FLAGS="${CMAKE_C_FLAGS} ${CFLAGS}" \
+			-D CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXXFLAGS}" \
 			-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
 			-D CMAKE_CXX_STANDARD="${standard}" \
 			-D CMAKE_PREFIX_PATH="${qbt_install_dir}" \
@@ -2091,6 +2093,8 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 			mkdir -p "${qbt_install_dir}/graphs/${libtorrent_github_tag}"
 			cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${libtorrent_github_tag}/dep-graph.dot" -G Ninja -B build \
 				"${multi_libtorrent[@]}" \
+				-D CMAKE_C_FLAGS="${CMAKE_C_FLAGS} ${CFLAGS}" \
+				-D CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXXFLAGS}" \
 				-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
 				-D CMAKE_BUILD_TYPE="Release" \
 				-D CMAKE_CXX_STANDARD="${standard}" \
@@ -2174,6 +2178,8 @@ if [[ "${!app_name_skip:-yes}" == 'no' || "${1}" == "${app_name}" ]]; then
 	if [[ "${qbt_build_tool}" == 'cmake' && "${qbt_qt_version}" =~ ^6 ]]; then
 		cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${double_conversion_version}/dep-graph.dot" -G Ninja -B build \
 			"${multi_libtorrent[@]}" \
+			-D CMAKE_C_FLAGS="${CMAKE_C_FLAGS} ${CFLAGS}" \
+			-D CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXXFLAGS}" \
 			-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
 			-D CMAKE_PREFIX_PATH="${qbt_install_dir}" \
 			-D CMAKE_CXX_FLAGS="${CXXFLAGS}" \
@@ -2214,6 +2220,8 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 		mkdir -p "${qbt_install_dir}/graphs/${libtorrent_github_tag}"
 		cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${qt6_version}/dep-graph.dot" -G Ninja -B build \
 			"${multi_libtorrent[@]}" \
+			-D CMAKE_C_FLAGS="${CMAKE_C_FLAGS} ${CFLAGS}" \
+			-D CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXXFLAGS}" \
 			-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
 			-D CMAKE_BUILD_TYPE="release" \
 			-D QT_FEATURE_optimize_full=on -D QT_FEATURE_static=on -D QT_FEATURE_shared=off \
@@ -2292,6 +2300,8 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 		mkdir -p "${qbt_install_dir}/graphs/${libtorrent_github_tag}"
 		cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${qt6_version}/dep-graph.dot" -G Ninja -B build \
 			"${multi_libtorrent[@]}" \
+			-D CMAKE_C_FLAGS="${CMAKE_C_FLAGS} ${CFLAGS}" \
+			-D CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXXFLAGS}" \
 			-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
 			-D CMAKE_BUILD_TYPE="release" \
 			-D CMAKE_CXX_STANDARD="${standard}" \
@@ -2353,6 +2363,9 @@ if [[ "${!app_name_skip:-yes}" == 'no' ]] || [[ "${1}" == "${app_name}" ]]; then
 			mkdir -p "${qbt_install_dir}/graphs/${qbittorrent_github_tag}"
 			cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${qbittorrent_github_tag}/dep-graph.dot" -G Ninja -B build \
 				"${multi_qbittorrent[@]}" \
+				-D CMAKE_C_FLAGS="${CMAKE_C_FLAGS} ${CFLAGS}" \
+				-D CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXXFLAGS}" \
+				-D CMAKE_CPP_FLAGS="${CMAKE_CPP_FLAGS} ${CPPFLAGS}" \
 				-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
 				-D CMAKE_BUILD_TYPE="release" \
 				-D QT6="${qbt_use_qt6}" \
